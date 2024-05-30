@@ -13,6 +13,10 @@ router.use(express.json());
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
+const XLSX = require('xlsx');
+const { PassThrough } = require('stream');
+
+
 // Configuración de Supabase
 console.log('process.env.SUPABASE_URL..............', process.env.SUPABASE_URL)
 console.log('process.env.SUPABASE_KEY..............', process.env.SUPABASE_KEY)
@@ -194,6 +198,9 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
     
         // Eliminar el archivo temporal
         fs.unlinkSync(file.path);
+
+        // (old, val, auth, error, act, fnc, resp)
+        await activityTrace(null, respInsrt, author, respErr, logActions[2].code, 'post(/upload)', uploadData)
     
         res.status(201).json({
             message: 'Archivo cargado y registro guardado exitosamente',
@@ -295,20 +302,71 @@ router.put('/documents/:id', verifyToken, upload.single('file'), async (req, res
     }
 });
 
+// Endpoint para descargar informe
+router.get('/download/:reportType', async (req, res) => {
+    try {
+        const { reportType } = req.params;
+        console.log('reportType................', reportType)
+        const query = reportType === 'log' ? 'activity_log' : 'docs'
+
+        // Consulta a la tabla activity_log
+        const { data, error } = await supabase.from(query).select('*');
+        console.log('data...............', data)
+
+        if (error) throw error
+
+        // Crear un libro de trabajo de Excel
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
+
+        // Agregar la hoja al libro de trabajo
+        XLSX.utils.book_append_sheet(wb, ws, query);
+
+        // Crear un flujo de lectura de datos para el archivo Excel
+        const stream = new PassThrough();
+        const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+
+        // Obtener la fecha actual
+        const currentDate = new Date().toISOString().slice(0, 10); // Obtener la fecha en formato YYYY-MM-DD
+
+        // Nombre del archivo con la fecha actual
+        const filename = `${query}_${currentDate}.xlsx`;
+
+        // Piping buffer data to stream
+        stream.end(buffer);
+
+        // Definir las cabeceras para la descarga del archivo
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        // Devolver el archivo Excel al cliente
+        stream.pipe(res);
+    } catch (error) {
+      console.error('Error al eliminar documento:', error.message);
+      res.status(404).json({
+          error: 'Error al eliminar documento ' + error.message
+      });
+    }
+});
+
 // Endpoint para eliminar documentos
 router.delete('/documents/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     console.log('id................', id)
-    const { data, error } = await supabase.from('docs').delete().match({ id });
+    const { data, error } = await supabase
+        .from('docs')
+        .delete()
+        .eq('id', id)
     console.log('data................', data)
     console.log('error................', error)
 
-    if (error) throw error
+    // (old, val, auth, error, act, fnc, resp)
+    await activityTrace(null, data, id, error, logActions[4].code, 'post(/documents/:id)', data)
 
-    res.status(200).json({
-        message: 'Documento eliminado exitosamente',
-        data
+    res.status(error ? 400 : 200).json({
+        message: error ? 'Error: ' + error : 'Documento eliminado exitosamente',
+        data 
     });
   } catch (error) {
     console.error('Error al eliminar documento:', error.message);
@@ -363,6 +421,55 @@ router.post('/newSuperUser', verifyToken, async (req, res) => {
             error: 'Error al registrar SUPER USERS ' + error.message
         });
     }
+});
+
+
+
+
+router.get('/downloads/:type', async (req, res) => {
+    try {
+        const { type } = req.params;
+        console.log('type................', type)
+        const query = type === 'log' ? 'activity_log' : 'docs'
+        // Consulta a la tabla activity_log
+        const { data, error } = await supabase.from(query).select('*');
+        console.log('data...............', data)
+    
+        if (error) throw error
+    
+        // Crear un libro de trabajo de Excel
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(data);
+    
+        // Agregar la hoja al libro de trabajo
+        XLSX.utils.book_append_sheet(wb, ws, query);
+    
+        // Crear un flujo de lectura de datos para el archivo Excel
+        const stream = new PassThrough();
+        const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+    
+        // Obtener la fecha actual
+        const currentDate = new Date().toISOString().slice(0, 10); // Obtener la fecha en formato YYYY-MM-DD
+    
+        // Nombre del archivo con la fecha actual
+        const filename = `${query}_${currentDate}.xlsx`;
+    
+        // Piping buffer data to stream
+        stream.end(buffer);
+    
+        // Definir las cabeceras para la descarga del archivo
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    
+        // Devolver el archivo Excel al cliente
+        stream.pipe(res);
+      } catch (error) {
+        console.log('error..............', error)
+        console.error(`Error al generar el informe ${query}: `, error.message);
+        res.status(404).json({
+            error: `Error al generar el informe ${query}: ` + error.message
+        });
+      }
 });
 
 module.exports = router;
