@@ -268,22 +268,33 @@ router.put('/documents/:id', verifyToken, upload.single('file'), async (req, res
 
         // Leer el archivo cargado
         const fileData = fs.readFileSync(file.path);
+        console.log('file.mimetype:::::::::::::::::::::::::::::::::::::::', file.mimetype)
 
+        const contentType = await getContentType(file.mimetype);  
+        console.log('contentType:::::::::::::::::::::::::::::::::::::::', contentType)
+    
         // Subir el archivo a Supabase Storage
-        const { data: uploadData, error: uploadError  } = await supabase.storage.from('raikou').upload(file.filename, fileData, {
-            contentType: 'application/pdf'
-        });
+        const { data: uploadData, error: uploadError  } = await supabase.storage
+            .from('raikou')
+            .upload(file.filename, fileData, {
+                contentType: contentType ? contentType : file.mimetyp
+            });
         console.log('uploadData------------------', uploadData)
         console.log('uploadError-----------------', uploadError)
 
         if (uploadError) throw uploadError;
 
-        const mimeType = file.mimetype
-        const partes = mimeType.split("/");
+        const mimeType = file.originalname
+        const partes = mimeType.split(".");
         const xt = partes[1];
 
         const urlBucket = process.env.BUCKET_URL + uploadData.path
         console.log('urlBucket--------------', urlBucket)
+
+        const currentDate = new Date().toISOString();
+        // Formatear la fecha según el formato deseado "YYYY-MM-DDTHH:MM:SS.sssZ"
+        const formattedDate = currentDate.slice(0, 23) + 'Z';
+        console.log('formattedDate--------------', formattedDate)
 
         const { data, error } = await supabase
             .from('docs')
@@ -291,7 +302,8 @@ router.put('/documents/:id', verifyToken, upload.single('file'), async (req, res
                 bucket_url: urlBucket,
                 xtension: xt,
                 file_name: file.originalname,
-                size: file.size
+                size: file.size,
+                created_at: formattedDate // Aquí se actualiza la fecha
             })
             .eq('id', id)
             .select()
@@ -300,7 +312,13 @@ router.put('/documents/:id', verifyToken, upload.single('file'), async (req, res
 
         if (error) throw error
 
-        res.status(200).json({ message: 'Documento actualizado exitosamente', data });
+        // Eliminar el archivo temporal
+        fs.unlinkSync(file.path);
+
+        res.status(200).json({
+            message: 'Documento actualizado exitosamente',
+            data
+        });
     } catch (error) {
         console.error('Error al editar documento:', error.message);
         res.status(404).json({
@@ -429,55 +447,6 @@ router.post('/newSuperUser', verifyToken, async (req, res) => {
             error: 'Error al registrar SUPER USERS ' + error.message
         });
     }
-});
-
-
-
-
-router.get('/downloads/:type', async (req, res) => {
-    try {
-        const { type } = req.params;
-        console.log('type................', type)
-        const query = type === 'log' ? 'activity_log' : 'docs'
-        // Consulta a la tabla activity_log
-        const { data, error } = await supabase.from(query).select('*');
-        console.log('data...............', data)
-    
-        if (error) throw error
-    
-        // Crear un libro de trabajo de Excel
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(data);
-    
-        // Agregar la hoja al libro de trabajo
-        XLSX.utils.book_append_sheet(wb, ws, query);
-    
-        // Crear un flujo de lectura de datos para el archivo Excel
-        const stream = new PassThrough();
-        const buffer = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
-    
-        // Obtener la fecha actual
-        const currentDate = new Date().toISOString().slice(0, 10); // Obtener la fecha en formato YYYY-MM-DD
-    
-        // Nombre del archivo con la fecha actual
-        const filename = `${query}_${currentDate}.xlsx`;
-    
-        // Piping buffer data to stream
-        stream.end(buffer);
-    
-        // Definir las cabeceras para la descarga del archivo
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    
-        // Devolver el archivo Excel al cliente
-        stream.pipe(res);
-      } catch (error) {
-        console.log('error..............', error)
-        console.error(`Error al generar el informe ${query}: `, error.message);
-        res.status(404).json({
-            error: `Error al generar el informe ${query}: ` + error.message
-        });
-      }
 });
 
 module.exports = router;
