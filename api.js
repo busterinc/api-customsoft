@@ -162,39 +162,25 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
     
         // Leer el archivo cargado
         const fileData = fs.readFileSync(file.path);
-
-        let contentType;
         console.log('file.mimetype:::::::::::::::::::::::::::::::::::::::', file.mimetype)
-        switch (file.mimetype) {
-            case 'image/jpeg':
-                contentType = 'image/jpeg';
-                break;
-            case 'image/png':
-                contentType = 'image/png';
-                break;
-            case 'application/pdf':
-                contentType = 'application/pdf';
-                break;
-            // Agrega más casos según sea necesario para otros tipos de archivos
-            default:
-                contentType = 'application/octet-stream'; // Tipo de contenido genérico
-                break;
-        }
+
+        const contentType = await getContentType(file.mimetype);  
         console.log('contentType:::::::::::::::::::::::::::::::::::::::', contentType)
     
         // Subir el archivo a Supabase Storage
         const { data: uploadData, error: uploadError  } = await supabase.storage
             .from('raikou')
             .upload(file.filename, fileData, {
-                contentType: file.mimetyp ? file.mimetyp : contentType
+                // contentType: file.mimetyp ? file.mimetyp : contentType
+                contentType: contentType ? contentType : file.mimetyp
             });
         console.log('uploadData................', uploadData)
         console.log('uploadError................', uploadError)
 
         if (uploadError) throw uploadError;
     
-        const mimeType = file.mimetype
-        const partes = mimeType.split("/");
+        const mimeType = file.originalname
+        const partes = mimeType.split(".");
         const xt = partes[1];
 
         const urlBucket = process.env.BUCKET_URL + uploadData.path
@@ -495,3 +481,103 @@ router.get('/downloads/:type', async (req, res) => {
 });
 
 module.exports = router;
+
+
+async function getContentType (mimetype) {
+    let contentType;
+
+    try {
+        switch (mimetype) {
+            // Application
+            case 'application/EDI-X12':
+            case 'application/EDIFACT':
+            case 'application/javascript':
+            case 'application/octet-stream':
+            case 'application/ogg':
+            case 'application/pdf':
+            case 'application/xhtml+xml':
+            case 'application/x-shockwave-flash':
+            case 'application/json':
+            case 'application/ld+json':
+            case 'application/xml':
+            case 'application/zip':
+            case 'application/x-www-form-urlencoded':
+                contentType = mimetype;
+                break;
+    
+            // Audio
+            case 'audio/mpeg':
+            case 'audio/x-ms-wma':
+            case 'audio/vnd.rn-realaudio':
+            case 'audio/x-wav':
+                contentType = mimetype;
+                break;
+    
+            // Image
+            case 'image/gif':
+            case 'image/jpeg':
+            case 'image/png':
+            case 'image/tiff':
+            case 'image/vnd.microsoft.icon':
+            case 'image/x-icon':
+            case 'image/vnd.djvu':
+            case 'image/svg+xml':
+                contentType = mimetype;
+                break;
+    
+            // Multipart
+            case 'multipart/mixed':
+            case 'multipart/alternative':
+            case 'multipart/related':
+            case 'multipart/form-data':
+                contentType = mimetype;
+                break;
+    
+            // Text
+            case 'text/css':
+            case 'text/csv':
+            case 'text/html':
+            case 'text/javascript':
+            case 'text/plain':
+            case 'text/xml':
+                contentType = mimetype;
+                break;
+    
+            // Video
+            case 'video/mpeg':
+            case 'video/mp4':
+            case 'video/quicktime':
+            case 'video/x-ms-wmv':
+            case 'video/x-msvideo':
+            case 'video/x-flv':
+            case 'video/webm':
+                contentType = mimetype;
+                break;
+    
+            // VND
+            case 'application/vnd.oasis.opendocument.text':
+            case 'application/vnd.oasis.opendocument.spreadsheet':
+            case 'application/vnd.oasis.opendocument.presentation':
+            case 'application/vnd.oasis.opendocument.graphics':
+            case 'application/vnd.ms-excel':
+            case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+            case 'application/vnd.ms-powerpoint':
+            case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+            case 'application/msword':
+            case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            case 'application/vnd.mozilla.xul+xml':
+                contentType = mimetype;
+                break;
+    
+            default:
+                contentType = 'application/octet-stream'; // Tipo de contenido genérico
+                break;
+        }
+    } catch (error) {
+        console.log('ERROR:: ', error)
+        return error
+    }
+    console.log('contentType °°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°°', contentType)
+
+    return contentType
+}
