@@ -162,11 +162,32 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
     
         // Leer el archivo cargado
         const fileData = fs.readFileSync(file.path);
+
+        let contentType;
+        console.log('file.mimetype:::::::::::::::::::::::::::::::::::::::', file.mimetype)
+        switch (file.mimetype) {
+            case 'image/jpeg':
+                contentType = 'image/jpeg';
+                break;
+            case 'image/png':
+                contentType = 'image/png';
+                break;
+            case 'application/pdf':
+                contentType = 'application/pdf';
+                break;
+            // Agrega más casos según sea necesario para otros tipos de archivos
+            default:
+                contentType = 'application/octet-stream'; // Tipo de contenido genérico
+                break;
+        }
+        console.log('contentType:::::::::::::::::::::::::::::::::::::::', contentType)
     
         // Subir el archivo a Supabase Storage
-        const { data: uploadData, error: uploadError  } = await supabase.storage.from('raikou').upload(file.filename, fileData, {
-        contentType: 'application/pdf'
-        });
+        const { data: uploadData, error: uploadError  } = await supabase.storage
+            .from('raikou')
+            .upload(file.filename, fileData, {
+                contentType: file.mimetyp ? file.mimetyp : contentType
+            });
         console.log('uploadData................', uploadData)
         console.log('uploadError................', uploadError)
 
@@ -308,6 +329,7 @@ router.get('/download/:reportType', async (req, res) => {
         const { reportType } = req.params;
         console.log('reportType................', reportType)
         const query = reportType === 'log' ? 'activity_log' : 'docs'
+        console.log('query................', query)
 
         // Consulta a la tabla activity_log
         const { data, error } = await supabase.from(query).select('*');
