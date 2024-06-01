@@ -261,7 +261,14 @@ router.put('/documents/:id', verifyToken, upload.single('file'), async (req, res
         const file = req.file;
         console.log('file-------------------', file)
 
-        console.log('req-------------------', req)
+        const { data: OldFileResp, error: OldFileError } = await supabase
+            .from('docs')
+            .select('*')
+            .eq('id', id)
+            .single()
+
+        console.log('OldFileResp..............', OldFileResp)
+        console.log('OldFileError..............', OldFileError)
 
         // Verificar si se cargó un archivo
         if (!file) throw new Error('No se proporcionó ningún archivo');
@@ -314,6 +321,9 @@ router.put('/documents/:id', verifyToken, upload.single('file'), async (req, res
 
         // Eliminar el archivo temporal
         fs.unlinkSync(file.path);
+
+        // (old, val, auth, error, act, fnc, resp)
+        await activityTrace(OldFileResp, data, null, error, logActions[3].code, 'PUT(/documents/:id)', uploadData)
 
         res.status(200).json({
             message: 'Documento actualizado exitosamente',
