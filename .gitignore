@@ -1,1 +1,48 @@
+# Dependencias instaladas
+/node_modules
+
+# Archivos generados durante la ejecución
+npm-debug.log
+yarn-error.log
 .env
+
+# Directorio de construcción (si utilizas alguna herramienta de construcción específica)
+/build
+
+# Dependencias instaladas de npm (si estás usando npm como gestor de paquetes)
+npm-debug.log*
+
+# Dependencias instaladas de Yarn (si estás usando Yarn como gestor de paquetes)
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencias instaladas de pnpm (si estás usando pnpm como gestor de paquetes)
+.pnpm
+.pnpm-debug.log
+
+# Dependencias instaladas de bower (si estás usando bower como gestor de paquetes)
+bower_components
+
+# Dependencias instaladas de jspm (si estás usando jspm como gestor de paquetes)
+jspm_packages
+
+# Archivos de cobertura de pruebas
+/coverage
+
+# Directorio .vscode (si estás usando Visual Studio Code como tu IDE)
+.vscode
+
+# Configuración específica del sistema operativo (por ejemplo, archivos .DS_Store en macOS)
+.DS_Store
+
+# Directorio de cache de npm (si tienes uno)
+.npm
+
+# Archivos de log
+logs
+
+# Cualquier archivo específico de tu IDE que no quieras versionar
+*.sublime-project
+*.sublime-workspace
+*.idea/
+*.vscode/
